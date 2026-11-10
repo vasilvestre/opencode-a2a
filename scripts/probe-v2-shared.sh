@@ -146,9 +146,9 @@ printf '%s' "$T2" | grep -q "$(hostname)"; check "2 hostname in reply" $?
 printf '%s' "$T2" | grep -q "$NONCE"; check "2 nonce in reply" $?
 T3A=$(printf '%s' "$R3A" | alltext); T3B=$(printf '%s' "$R3B" | alltext)
 printf '%s' "$T3A" | grep -q ALPHA-777; check "3 context a answered" $?
-printf '%s' "$T3A" | grep -q BETA-888 && check "3 context a leaked b" 1 || check "3 context a leaked b" 0
+! printf '%s' "$T3A" | grep -q BETA-888; check "3 context a has no b text" $?
 printf '%s' "$T3B" | grep -q BETA-888; check "3 context b answered" $?
-printf '%s' "$T3B" | grep -q ALPHA-777 && check "3 context b leaked a" 1 || check "3 context b leaked a" 0
+! printf '%s' "$T3B" | grep -q ALPHA-777; check "3 context b has no a text" $?
 printf '%s' "$R4A" | alltext | grep -q GAMMA-999; check "4 new task after restart" $?
 printf '%s' "$R4B" | state | grep -q TASK_STATE_FAILED; check "4 old context not adopted" $?
 say ""
