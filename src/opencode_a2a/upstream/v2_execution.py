@@ -36,12 +36,15 @@ from .v2_events import (
     V2ExecutionUncertainError,
     _object,
 )
+from .v2_session_registry import V2SessionRegistry
 
 _TERMINALS = {
     "session.execution.succeeded": ExecutionState.COMPLETED,
     "session.execution.failed": ExecutionState.FAILED,
     "session.execution.interrupted": ExecutionState.CANCELLED,
 }
+
+_REFUSAL = "V2 execution requires a gateway-created session"
 
 V2StreamUpdate = dict[str, object] | ExecutionUpdate
 
@@ -91,6 +94,9 @@ class V2ExecutionEngine:
         self.update_limit = update_limit
         self.page_limit = page_limit
         self.sessions: dict[str, _Session] = {}
+        self.registry = V2SessionRegistry.from_database_url(
+            client._settings.a2a_task_store_database_url
+        )
         self.max_active = (
             client._settings.opencode_max_concurrent_requests if max_active is None else max_active
         )
@@ -123,6 +129,39 @@ class V2ExecutionEngine:
         """Register a freshly generated upstream ID, never an existing/continued ID."""
         subscription = self.hub.register(session)
         self.sessions[session] = _Session(directory, subscription, asyncio.Queue(self.update_limit))
+        # A fresh session has no projected message yet, so a restart must not adopt it.
+        self.registry.save(session, directory, None)
+
+    async def adopt(self, session: str, directory: str) -> None:
+        """Reclaim a session this gateway created before a restart.
+
+        Adoption needs the stored tail to equal the newest upstream message: only
+        then is this gateway still the last writer, which is what makes a terminal
+        attributable to the next input. Every other outcome refuses.
+        """
+        if session in self.sessions:
+            return
+        record = self.registry.get(session)
+        if record is None or record.directory != directory or record.last_message_id is None:
+            raise V2ExecutionUncertainError(_REFUSAL)
+        subscription = self.hub.register(session)
+        candidate = _Session(directory, subscription, asyncio.Queue(self.update_limit))
+        try:
+            page = await self._get(
+                f"{self._path(session)}/message", candidate, limit="1", order="desc"
+            )
+            items = page.get("data")
+            if not isinstance(items, list) or not items:
+                raise V2ExecutionUncertainError(_REFUSAL)
+            if _object(items[0]).get("id") != record.last_message_id:
+                raise V2ExecutionUncertainError(_REFUSAL)
+        except V2ExecutionUncertainError:
+            self.hub.unregister(session)
+            raise
+        except Exception as exc:
+            self.hub.unregister(session)
+            raise V2ExecutionUncertainError(_REFUSAL) from exc
+        self.sessions[session] = candidate
 
     def reject_intervention(self, session: str) -> None:
         self._session(session).subscription.poison("Unsupported native intervention")
@@ -130,7 +169,7 @@ class V2ExecutionEngine:
     def _session(self, session: str) -> _Session:
         state = self.sessions.get(session)
         if state is None:
-            raise V2ExecutionUncertainError("Execution requires a gateway-created session")
+            raise V2ExecutionUncertainError(_REFUSAL)
         self.hub.check()
         state.subscription.check()
         # Dict order is the LRU order; there is no unbounded retired-ID registry.
@@ -528,6 +567,8 @@ class V2ExecutionEngine:
             or messages[idle_id].get("outcome") != outcome_name
         ):
             raise V2ExecutionUncertainError("Persisted input or terminal outcome does not match")
+        # Page one is newest-first, so its first item is the tail a restart compares.
+        self.registry.save(session, state.directory, next(iter(messages)))
         output: list[str] = []
         for identity in record.assistants:
             assistant = messages[identity]
