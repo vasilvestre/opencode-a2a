@@ -50,7 +50,14 @@ def validate_exclusive_configuration(entries: object, plugins: object) -> None:
             raise UpstreamContractError("V2 exclusive execution permits builtin plugins only")
 
 
-def exclusive_permissions() -> list[dict[str, str]]:
+def exclusive_permissions(policy: str = "readonly") -> list[dict[str, str]]:
+    if policy == "full":
+        # Shared-workspace operator choice: the agent keeps the workspace boundary
+        # but may run every builtin tool, shell included.
+        return [
+            {"action": "*", "resource": "*", "effect": "allow"},
+            {"action": "external_directory", "resource": "*", "effect": "deny"},
+        ]
     return [
         {"action": "*", "resource": "*", "effect": "deny"},
         {"action": "question", "resource": "*", "effect": "allow"},

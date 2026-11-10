@@ -153,6 +153,12 @@ class Settings(BaseSettings):
     opencode_v2_execution: Literal["disabled", "exclusive"] = Field(
         default="disabled", alias="OPENCODE_V2_EXECUTION"
     )
+    # Local fork (v2-shared): pin escape hatch, shared upstream inventory, tool policy.
+    a2a_upstream_pin_override: bool = Field(default=False, alias="A2A_UPSTREAM_PIN_OVERRIDE")
+    a2a_shared_workspace: bool = Field(default=False, alias="A2A_SHARED_WORKSPACE")
+    a2a_tool_policy: Literal["full", "readonly"] = Field(
+        default="readonly", alias="A2A_TOOL_POLICY"
+    )
     opencode_base_url: str = Field(default="http://127.0.0.1:4096", alias="OPENCODE_BASE_URL")
     opencode_workspace_root: str | None = Field(default=None, alias="OPENCODE_WORKSPACE_ROOT")
     opencode_agent: str | None = Field(default=None, alias="OPENCODE_AGENT")

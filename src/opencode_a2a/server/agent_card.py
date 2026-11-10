@@ -76,7 +76,7 @@ def _build_agent_card_description(
         )
     if capability_snapshot.v2_exclusive_execution:
         return (
-            f"{base} Experimental OpenCode 2.0.28 exclusive execution: text-only prompts, "
+            f"{base} Experimental OpenCode 2.x exclusive execution: text-only prompts, "
             "one task per gateway-created session, parallel distinct sessions, and streaming "
             "read-permission/question interventions. Requires a dedicated private upstream, "
             "no external or autonomous writers, and protected configuration. Event loss "

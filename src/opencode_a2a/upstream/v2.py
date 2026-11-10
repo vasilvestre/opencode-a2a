@@ -71,8 +71,14 @@ class V2UpstreamAdapter(OpencodeUpstreamClient):
 
     async def _verify_exclusive_profile(self, directory: str) -> None:
         info = await self.get_server_info()
-        if info.get("version") != "2.0.28":
-            raise UpstreamContractError("V2 exclusive execution is pinned to OpenCode 2.0.28")
+        version = str(info.get("version", ""))
+        if not version.startswith("2.") and not self.settings.a2a_upstream_pin_override:
+            raise UpstreamContractError(
+                f"V2 exclusive execution supports OpenCode 2.x, but /api/info reports "
+                f"version {version!r}; set A2A_UPSTREAM_PIN_OVERRIDE=1 to accept it"
+            )
+        if self.settings.a2a_shared_workspace:
+            return
         query = {"location[directory]": directory}
         entries = await self._get_v2_json("/api/config", endpoint="/api/config", params=query)
         plugins = await self._get_v2_json("/api/plugin", endpoint="/api/plugin", params=query)
@@ -153,9 +159,10 @@ class V2UpstreamAdapter(OpencodeUpstreamClient):
                 raise UpstreamContractError(
                     "OpenCode V2 /api/info response must include a string version"
                 )
-            if not version.startswith("2."):
+            if not version.startswith("2.") and not self.settings.a2a_upstream_pin_override:
                 raise UpstreamContractError(
-                    f"OpenCode V2 was selected but /api/info reports version {version!r}"
+                    f"OpenCode V2 was selected but /api/info reports version {version!r}; "
+                    "set A2A_UPSTREAM_PIN_OVERRIDE=1 to accept it"
                 )
             server_info = cast(Mapping[str, Any], payload)
             self._v2_server_info = server_info
@@ -183,7 +190,7 @@ class V2UpstreamAdapter(OpencodeUpstreamClient):
         payload: dict[str, Any] = {"location": {"directory": resolved_directory}}
         if self.prompt_execution_supported:
             await self._verify_exclusive_profile(resolved_directory)
-            payload["permissions"] = exclusive_permissions()
+            payload["permissions"] = exclusive_permissions(self.settings.a2a_tool_policy)
         if title:
             payload["title"] = title
         async with self._v2_creation_lock:
@@ -290,10 +297,8 @@ class V2UpstreamAdapter(OpencodeUpstreamClient):
         resolved = self._resolve_location(directory, workspace_id)
         await self._verify_exclusive_profile(resolved)
         session = await self.get_session(session_id, directory=resolved)
-        if (
-            not isinstance(session, Mapping)
-            or session.get("permissions") != exclusive_permissions()
-        ):
+        expected_permissions = exclusive_permissions(self.settings.a2a_tool_policy)
+        if not isinstance(session, Mapping) or session.get("permissions") != expected_permissions:
             raise UpstreamContractError("V2 session permissions do not match the exclusive profile")
         current = asyncio.current_task()
         if current is None:
