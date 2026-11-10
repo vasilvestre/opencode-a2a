@@ -19,6 +19,7 @@ from opencode_a2a.server.state_store import (
 from tests.support.helpers import (
     configure_mock_client_runtime,
     make_request_context_mock,
+    persisted_task,
 )
 from tests.support.settings import make_settings
 
@@ -138,20 +139,11 @@ async def test_session_hijack_prevention(mock_client):
     await executor.execute(context2, event_queue)
 
     # Verify error emission
-    # Note: we check call_args_list to find the Task
-    from a2a.types import Task
-
-    found_error_task = False
-    for call in event_queue.enqueue_event.call_args_list:
-        event = call[0][0]
-        if isinstance(event, Task) and event.status.state == TaskState.TASK_STATE_FAILED:
-            # Handle a2a types where parts contain root models
-            part = event.status.message.parts[0]
-            text = getattr(part, "text", None) or getattr(getattr(part, "root", None), "text", "")
-            if "not owned by you" in text:
-                found_error_task = True
-                break
-    assert found_error_task
+    task = persisted_task([call[0][0] for call in event_queue.enqueue_event.call_args_list])
+    assert task is not None and task.status.state == TaskState.TASK_STATE_FAILED
+    part = task.status.message.parts[0]
+    text = getattr(part, "text", None) or getattr(getattr(part, "root", None), "text", "")
+    assert "not owned by you" in text
 
 
 @pytest.mark.asyncio

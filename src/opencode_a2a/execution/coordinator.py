@@ -12,7 +12,6 @@ import httpx
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events.event_queue import EventQueue
 from a2a.types import (
-    Artifact,
     Message,
     Part,
     Role,
@@ -133,9 +132,14 @@ class ExecutionCoordinator:
             await self._register_running_request(current_task)
 
         try:
-            early_snapshot = getattr(
-                self._executor._client, "supports_streaming_submission", False
-            ) is True and (self._prepared.streaming_request or self._prepared.return_immediately)
+            # The SDK creates a task from its first event and ignores later Task
+            # events, so a new task must exist before the upstream call: polling
+            # clients otherwise see nothing until the terminal state.
+            new_task = self._context.current_task is None
+            early_snapshot = new_task or (
+                getattr(self._executor._client, "supports_streaming_submission", False) is True
+                and (self._prepared.streaming_request or self._prepared.return_immediately)
+            )
             if early_snapshot:
                 await self._event_queue.enqueue_event(self._build_initial_task_snapshot())
             await self._bind_session()
@@ -261,6 +265,7 @@ class ExecutionCoordinator:
                 error_type=error_type,
                 upstream_status=exc.response.status_code,
                 streaming_request=self._prepared.streaming_request,
+                task_persisted=True,
             )
         except httpx.TimeoutException as exc:
             logger.warning(
@@ -276,6 +281,7 @@ class ExecutionCoordinator:
                 state=TaskState.TASK_STATE_FAILED,
                 error_type="UPSTREAM_TIMEOUT",
                 streaming_request=self._prepared.streaming_request,
+                task_persisted=True,
             )
         except UpstreamContractError as exc:
             logger.warning("OpenCode request failed with payload mismatch: %s", exc)
@@ -287,6 +293,7 @@ class ExecutionCoordinator:
                 state=TaskState.TASK_STATE_FAILED,
                 error_type="UPSTREAM_PAYLOAD_ERROR",
                 streaming_request=self._prepared.streaming_request,
+                task_persisted=True,
             )
         except UpstreamConcurrencyLimitError as exc:
             logger.debug("OpenCode request rejected by concurrency budget: %s", exc)
@@ -298,6 +305,7 @@ class ExecutionCoordinator:
                 state=TaskState.TASK_STATE_FAILED,
                 error_type="UPSTREAM_BACKPRESSURE",
                 streaming_request=self._prepared.streaming_request,
+                task_persisted=True,
             )
         except Exception as exc:
             logger.exception("OpenCode request failed")
@@ -308,6 +316,7 @@ class ExecutionCoordinator:
                 message=f"OpenCode error: {exc}",
                 state=TaskState.TASK_STATE_FAILED,
                 streaming_request=self._prepared.streaming_request,
+                task_persisted=True,
             )
         finally:
             await self._cleanup()
@@ -428,6 +437,7 @@ class ExecutionCoordinator:
                 error_type=response_error.error_type,
                 upstream_status=response_error.upstream_status,
                 streaming_request=self._prepared.streaming_request,
+                task_persisted=True,
             )
             return
 
@@ -551,33 +561,35 @@ class ExecutionCoordinator:
             task_id=self._task_id,
             context_id=self._context_id,
         )
-        artifact = Artifact(
-            artifact_id=str(uuid.uuid4()),
-            name="response",
-            parts=[Part(text=response_text)],
-        )
-        if self._context.current_task and self._context.current_task.history:
-            history = list(self._context.current_task.history)
-        else:
-            history = []
-            if self._context.message:
-                history.append(self._context.message)
-        task = Task(
-            id=self._task_id,
+        await _enqueue_artifact_update(
+            event_queue=self._event_queue,
+            task_id=self._task_id,
             context_id=self._context_id,
-            status=TaskStatus(state=TaskState.TASK_STATE_COMPLETED),
-            history=history,
-            artifacts=[artifact],
-            metadata=_build_output_metadata(
-                session_id=session_id,
-                usage=resolved_token_usage,
-                include_session_metadata=self._prepared.emit_session_metadata,
-                include_streaming_metadata=self._prepared.emit_streaming_metadata,
-                include_interrupt_metadata=self._prepared.emit_interrupt_metadata,
-            ),
+            artifact_id=str(uuid.uuid4()),
+            artifact_name="response",
+            part=Part(text=response_text),
+            append=False,
+            last_chunk=True,
         )
-        task.status.message.CopyFrom(status_message)
-        await self._event_queue.enqueue_event(task)
+        # A terminal snapshot is immutable once persisted, so the result is merged
+        # into the stored task instead of replacing it.
+        await self._event_queue.enqueue_event(
+            TaskStatusUpdateEvent(
+                task_id=self._task_id,
+                context_id=self._context_id,
+                status=TaskStatus(
+                    state=TaskState.TASK_STATE_COMPLETED,
+                    message=status_message,
+                ),
+                metadata=_build_output_metadata(
+                    session_id=session_id,
+                    usage=resolved_token_usage,
+                    include_session_metadata=self._prepared.emit_session_metadata,
+                    include_streaming_metadata=self._prepared.emit_streaming_metadata,
+                    include_interrupt_metadata=self._prepared.emit_interrupt_metadata,
+                ),
+            )
+        )
 
     def _build_initial_task_snapshot(self) -> Task:
         current_task = self._context.current_task

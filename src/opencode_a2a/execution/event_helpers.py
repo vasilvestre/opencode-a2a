@@ -16,12 +16,14 @@ async def _enqueue_artifact_update(
     part: Part,
     append: bool | None,
     last_chunk: bool | None,
+    artifact_name: str | None = None,
     artifact_metadata: Mapping[str, Any] | None = None,
     event_metadata: Mapping[str, Any] | None = None,
 ) -> None:
     normalized_last_chunk = True if last_chunk is True else None
     artifact = Artifact(
         artifact_id=artifact_id,
+        name=artifact_name,
         parts=[part],
         metadata=dict(artifact_metadata) if artifact_metadata else None,
     )

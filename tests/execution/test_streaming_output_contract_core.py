@@ -13,6 +13,7 @@ from a2a.types import (
     SendMessageRequest,
     Task,
     TaskState,
+    TaskStatus,
     TaskStatusUpdateEvent,
 )
 
@@ -32,6 +33,7 @@ from tests.support.helpers import (
     DummyEventQueue,
     make_request_context,
     make_request_context_with_parts,
+    persisted_task,
 )
 from tests.support.streaming_output import (
     DummyStreamingClient,
@@ -77,17 +79,11 @@ async def test_receipt_only_prompt_submission_fails_without_resending() -> None:
         queue,
     )
 
-    failed_tasks = [
-        event
-        for event in queue.events
-        if isinstance(event, Task) and event.status.state == TaskState.TASK_STATE_FAILED
-    ]
+    task = persisted_task(queue.events)
     assert submit_prompt.await_count == 1
     send_message.assert_not_awaited()
-    assert len(failed_tasks) == 1
-    assert (
-        "asynchronous observation is not supported" in failed_tasks[0].status.message.parts[0].text
-    )
+    assert task is not None and task.status.state == TaskState.TASK_STATE_FAILED
+    assert "asynchronous observation is not supported" in task.status.message.parts[0].text
 
 
 @pytest.mark.parametrize(
@@ -146,17 +142,9 @@ async def test_non_completed_outcome_without_error_metadata_is_terminal_before_t
         queue,
     )
 
-    failed_tasks = [
-        event
-        for event in queue.events
-        if isinstance(event, Task) and event.status.state == task_state
-    ]
-    assert len(failed_tasks) == 1
-    assert failed_tasks[0].status.message.parts[0].text == "OpenCode execution did not complete."
-    assert not any(
-        isinstance(event, Task) and event.status.state == TaskState.TASK_STATE_COMPLETED
-        for event in queue.events
-    )
+    task = persisted_task(queue.events)
+    assert task is not None and task.status.state == task_state
+    assert task.status.message.parts[0].text == "OpenCode execution did not complete."
     assert tool_calls == []
 
 
@@ -179,17 +167,11 @@ async def test_invalid_prompt_submission_fails_without_legacy_resend() -> None:
         queue,
     )
 
-    failed_tasks = [
-        event
-        for event in queue.events
-        if isinstance(event, Task) and event.status.state == TaskState.TASK_STATE_FAILED
-    ]
+    task = persisted_task(queue.events)
     assert submit_prompt.await_count == 1
     send_message.assert_not_awaited()
-    assert len(failed_tasks) == 1
-    assert "submit_prompt must return PromptSubmission" in (
-        failed_tasks[0].status.message.parts[0].text
-    )
+    assert task is not None and task.status.state == TaskState.TASK_STATE_FAILED
+    assert "submit_prompt must return PromptSubmission" in task.status.message.parts[0].text
 
 
 @pytest.mark.asyncio
@@ -1117,12 +1099,33 @@ async def test_non_streaming_response_task_state_is_completed() -> None:
         queue,
     )
 
-    tasks = [event for event in queue.events if isinstance(event, Task)]
-    assert tasks
-    task = tasks[-1]
+    task = persisted_task(queue.events)
+    assert task is not None
     assert task.status.state == TaskState.TASK_STATE_COMPLETED
     assert task.status.message.parts[0].text == "Completed."
     assert task.artifacts[0].parts[0].text == "answer"
+
+
+@pytest.mark.asyncio
+async def test_resumed_task_reuses_the_stored_row_without_a_new_snapshot() -> None:
+    client = DummyStreamingClient(
+        stream_events_payload=[],
+        response_text="answer",
+    )
+    executor = OpencodeAgentExecutor(client, streaming_enabled=True)
+    queue = DummyEventQueue()
+    context = make_request_context(task_id="task-resume", context_id="ctx-resume", text="hello")
+    context.current_task = Task(
+        id="task-resume",
+        context_id="ctx-resume",
+        status=TaskStatus(state=TaskState.TASK_STATE_INPUT_REQUIRED),
+    )
+
+    await executor.execute(context, queue)
+
+    assert not any(isinstance(event, Task) for event in queue.events)
+    assert isinstance(queue.events[-1], TaskStatusUpdateEvent)
+    assert queue.events[-1].status.state == TaskState.TASK_STATE_COMPLETED
 
 
 @pytest.mark.asyncio
@@ -1152,5 +1155,5 @@ async def test_non_streaming_return_immediately_emits_initial_working_task() -> 
 
     assert isinstance(queue.events[0], Task)
     assert queue.events[0].status.state == TaskState.TASK_STATE_WORKING
-    tasks = [event for event in queue.events if isinstance(event, Task)]
-    assert tasks[-1].status.state == TaskState.TASK_STATE_COMPLETED
+    task = persisted_task(queue.events)
+    assert task is not None and task.status.state == TaskState.TASK_STATE_COMPLETED

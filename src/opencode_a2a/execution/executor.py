@@ -582,6 +582,7 @@ class OpencodeAgentExecutor(AgentExecutor):
         error_type: str | None = None,
         upstream_status: int | None = None,
         streaming_request: bool,
+        task_persisted: bool = False,
     ) -> None:
         if (task_id, context_id) in self._cancelled_requests:
             return
@@ -616,6 +617,27 @@ class OpencodeAgentExecutor(AgentExecutor):
                     task_id=task_id,
                     context_id=context_id,
                     status=TaskStatus(state=state),
+                    metadata=error_metadata,
+                )
+            )
+            return
+        if task_persisted:
+            # The task row exists, so a Task event would be dropped as a
+            # replacement and leave the task stuck in its previous state.
+            await _enqueue_artifact_update(
+                event_queue=event_queue,
+                task_id=task_id,
+                context_id=context_id,
+                artifact_id=f"{task_id}:error",
+                part=Part(text=message),
+                append=False,
+                last_chunk=True,
+            )
+            await event_queue.enqueue_event(
+                TaskStatusUpdateEvent(
+                    task_id=task_id,
+                    context_id=context_id,
+                    status=TaskStatus(state=state, message=error_message),
                     metadata=error_metadata,
                 )
             )
