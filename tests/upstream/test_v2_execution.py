@@ -34,7 +34,13 @@ class EventStream(httpx.AsyncByteStream):
 
 
 class NativeServer:
-    def __init__(self, monkeypatch: pytest.MonkeyPatch, mode: str = "success") -> None:
+    def __init__(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        mode: str = "success",
+        *,
+        database_url: str | None = None,
+    ) -> None:
         self.mode = mode
         self.feed = EventStream()
         self.feed.send({"type": "server.connected"})
@@ -43,7 +49,10 @@ class NativeServer:
         self.inputs: list[str] = []
         self.sequences: dict[str, int] = {}
         self.admitted = asyncio.Event()
-        self.client = V2UpstreamAdapter(make_settings())
+        settings = make_settings()
+        if database_url is not None:
+            settings = make_settings(a2a_task_store_database_url=database_url)
+        self.client = V2UpstreamAdapter(settings)
         monkeypatch.setattr(self.client._client, "_transport", httpx.MockTransport(self.handle))
         self.hub = V2EventHub(self.client, ready_timeout=0.1)
         self.engine = V2ExecutionEngine(self.client, self.hub, timeout=0.5)

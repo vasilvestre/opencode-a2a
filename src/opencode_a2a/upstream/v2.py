@@ -282,10 +282,6 @@ class V2UpstreamAdapter(OpencodeUpstreamClient):
     ) -> PromptSubmission:
         if not self.prompt_execution_supported:
             raise UnsupportedUpstreamOperationError(self.prompt_execution_unsupported_reason)
-        if session_id not in self._v2_execution.sessions:
-            raise UnsupportedUpstreamOperationError(
-                "V2 execution requires a gateway-created session"
-            )
         if model_override or (parts and any(part.get("type") != "text" for part in parts)):
             raise UnsupportedUpstreamOperationError(
                 "V2 exclusive execution supports text only, without request-scoped model overrides"
@@ -295,6 +291,12 @@ class V2UpstreamAdapter(OpencodeUpstreamClient):
         if parts and any(not isinstance(part.get("text"), str) for part in parts):
             raise ValueError("V2 text parts require string text")
         resolved = self._resolve_location(directory, workspace_id)
+        if session_id not in self._v2_execution.sessions:
+            # A restart drops in-memory ownership; the engine re-proves it first.
+            try:
+                await self._v2_execution.adopt(session_id, resolved)
+            except V2ExecutionUncertainError as exc:
+                raise UnsupportedUpstreamOperationError(str(exc)) from exc
         await self._verify_exclusive_profile(resolved)
         session = await self.get_session(session_id, directory=resolved)
         expected_permissions = exclusive_permissions(self.settings.a2a_tool_policy)
