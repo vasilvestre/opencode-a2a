@@ -127,11 +127,56 @@ start_gateway || exit 1
 R4A=$(send "probe-4a" "Reply with exactly: GAMMA-999")
 say "new context after restart: $R4A"
 say "state: $(printf '%s' "$R4A" | state)"
-R4B=$(send "probe-3a" "Reply with exactly: DELTA-555")
+R4B=$(send "probe-3a" "In your previous message in this session you replied with a single word. Reply with that word only.")
 say "old context probe-3a after restart: $R4B"
 say "state: $(printf '%s' "$R4B" | state)"
 say "upstream sessions after restart:"
 sessions | tee -a "$REPORT"
+
+# Case 5: a writer outside the gateway must defeat the re-adoption.
+say ""
+say "=== 5. foreign writer while the gateway is down ==="
+for pid in $(ss -ltnp 2>/dev/null | grep -oP ":$PORT .*pid=\K[0-9]+"); do kill "$pid"; done
+sleep 2
+REG="${DB%.db}.sessions.json"
+SID=$(python3 - "$REG" "$UPSTREAM" "$D" "$PASS" <<'PY'
+import base64, json, sys, urllib.request
+
+registry, upstream, directory, password = sys.argv[1:5]
+auth = base64.b64encode(f"opencode:{password}".encode()).decode()
+for sid in json.load(open(registry)):
+    request = urllib.request.Request(
+        f"{upstream}/api/session/{sid}/message"
+        f"?order=desc&limit=10&location[directory]={directory}",
+        headers={"Authorization": f"Basic {auth}"},
+    )
+    page = json.loads(urllib.request.urlopen(request, timeout=30).read().decode())
+    if "ALPHA-777" in json.dumps(page.get("data") or page):
+        print(sid)
+        break
+PY
+)
+say "session behind probe-3a: ${SID:-NOT FOUND}"
+TAIL_BEFORE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]]['last_message_id'])" "$REG" "$SID" 2>/dev/null)
+say "registry tail: ${TAIL_BEFORE:-MISSING}"
+FOREIGN="msg_$(openssl rand -hex 8)"
+curl -s -m 120 -u "opencode:$PASS" -H 'Content-Type: application/json' -X POST \
+  "$UPSTREAM/api/session/$SID/prompt?location%5Bdirectory%5D=$D" \
+  -d "{\"id\":\"$FOREIGN\",\"text\":\"Reply with exactly: FOREIGN-999\",\"delivery\":\"queue\",\"resume\":true}" \
+  | tee -a "$REPORT" >/dev/null
+NEWEST=""
+for _ in $(seq 1 60); do
+  NEWEST=$(curl -s -u "opencode:$PASS" \
+    "$UPSTREAM/api/session/$SID/message?order=desc&limit=1&location%5Bdirectory%5D=$D" |
+    python3 -c 'import json,sys; d=json.load(sys.stdin).get("data",[]); print(d[0]["id"] if d else "")')
+  [ -n "$NEWEST" ] && [ "$NEWEST" != "$TAIL_BEFORE" ] && break
+  sleep 2
+done
+say "upstream newest: ${NEWEST:-NONE}"
+start_gateway || exit 1
+R5=$(send "probe-3a" "Reply with exactly: MUST-REFUSE")
+say "tampered context probe-3a: $R5"
+say "state: $(printf '%s' "$R5" | state)"
 
 for pid in $(ss -ltnp 2>/dev/null | grep -oP ":$PORT .*pid=\K[0-9]+"); do kill "$pid"; done
 
@@ -150,7 +195,10 @@ printf '%s' "$T3A" | grep -q ALPHA-777; check "3 context a answered" $?
 printf '%s' "$T3B" | grep -q BETA-888; check "3 context b answered" $?
 ! printf '%s' "$T3B" | grep -q ALPHA-777; check "3 context b has no a text" $?
 printf '%s' "$R4A" | alltext | grep -q GAMMA-999; check "4 new task after restart" $?
-printf '%s' "$R4B" | state | grep -q TASK_STATE_FAILED; check "4 old context not adopted" $?
+printf '%s' "$R4B" | state | grep -q TASK_STATE_COMPLETED; check "4 old context adopted after restart" $?
+printf '%s' "$R4B" | alltext | grep -q ALPHA-777; check "4 adopted context recalls its own answer" $?
+printf '%s' "$R5" | state | grep -q TASK_STATE_FAILED; check "5 tampered context refused" $?
+printf '%s' "$R5" | alltext | grep -q "gateway-created session"; check "5 refusal names the ownership rule" $?
 say ""
 [ "$FAIL" -eq 0 ] && say "=== PROBE PASSED ===" || say "=== PROBE FAILED ==="
 say "report: $REPORT"
