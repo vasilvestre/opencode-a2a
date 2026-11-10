@@ -6,7 +6,16 @@ from unittest.mock import MagicMock, PropertyMock
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.context import ServerCallContext
-from a2a.types import Message, Part, Role, SendMessageConfiguration, SendMessageRequest
+from a2a.types import (
+    Message,
+    Part,
+    Role,
+    SendMessageConfiguration,
+    SendMessageRequest,
+    Task,
+    TaskArtifactUpdateEvent,
+    TaskStatusUpdateEvent,
+)
 
 from opencode_a2a.config import Settings
 from opencode_a2a.contracts.extensions import (
@@ -34,6 +43,39 @@ class DummyEventQueue:
 
     async def close(self) -> None:
         return None
+
+
+def persisted_task(events: list[Any]) -> Task | None:
+    """Fold emitted events into the task the SDK persists.
+
+    The SDK creates a task from the first Task event and merges every later
+    status or artifact update into it, so assertions must fold them the same way.
+    """
+    task: Task | None = None
+    for event in events:
+        if isinstance(event, Task):
+            if task is None:
+                task = Task()
+                task.CopyFrom(event)
+        elif isinstance(event, TaskStatusUpdateEvent | TaskArtifactUpdateEvent):
+            if task is None:
+                raise AssertionError(f"{type(event).__name__} arrived before the task was created")
+            if isinstance(event, TaskStatusUpdateEvent):
+                if task.status.HasField("message"):
+                    task.history.append(task.status.message)
+                if event.metadata:
+                    task.metadata.MergeFrom(event.metadata)
+                task.status.CopyFrom(event.status)
+                continue
+            existing = next(
+                (a for a in task.artifacts if a.artifact_id == event.artifact.artifact_id),
+                None,
+            )
+            if event.append is True and existing is not None:
+                existing.parts.extend(event.artifact.parts)
+            else:
+                task.artifacts.append(event.artifact)
+    return task
 
 
 def _default_requested_extensions() -> set[str]:

@@ -8,7 +8,7 @@ import pytest
 import pytest_asyncio
 from a2a.server.agent_execution import RequestContext
 from a2a.server.context import ServerCallContext
-from a2a.types import Task, TaskState, TaskStatusUpdateEvent
+from a2a.types import TaskState, TaskStatusUpdateEvent
 from a2a.utils.errors import TaskNotCancelableError
 
 from opencode_a2a.execution.executor import OpencodeAgentExecutor
@@ -108,9 +108,7 @@ async def server(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[ExecutorServe
 
 def states(queue: DummyEventQueue) -> list[TaskState]:
     return [
-        event.status.state
-        for event in queue.events
-        if isinstance(event, (Task, TaskStatusUpdateEvent))
+        event.status.state for event in queue.events if isinstance(event, TaskStatusUpdateEvent)
     ]
 
 

@@ -19,6 +19,7 @@ from tests.support.helpers import (
     configure_mock_client_runtime,
     make_request_context,
     make_request_context_mock,
+    persisted_task,
 )
 
 
@@ -181,12 +182,7 @@ async def test_execute_http_error_maps_to_task_error_type_and_state(
 
     await executor.execute(context, event_queue)
 
-    event = None
-    for call in event_queue.enqueue_event.call_args_list:
-        payload = call.args[0]
-        if isinstance(payload, Task):
-            event = payload
-            break
+    event = persisted_task([call.args[0] for call in event_queue.enqueue_event.call_args_list])
     assert event is not None
     assert event.status.state == expected_state
     metadata = _metadata_dict(event.metadata)
@@ -347,12 +343,7 @@ async def test_execute_upstream_payload_error_maps_to_task_error_type() -> None:
 
     await executor.execute(context, event_queue)
 
-    event = None
-    for call in event_queue.enqueue_event.call_args_list:
-        payload = call.args[0]
-        if isinstance(payload, Task):
-            event = payload
-            break
+    event = persisted_task([call.args[0] for call in event_queue.enqueue_event.call_args_list])
 
     assert event is not None
     assert event.status.state == TaskState.TASK_STATE_FAILED
@@ -391,12 +382,7 @@ async def test_execute_upstream_backpressure_maps_to_task_error_type() -> None:
 
     await executor.execute(context, event_queue)
 
-    event = None
-    for call in event_queue.enqueue_event.call_args_list:
-        payload = call.args[0]
-        if isinstance(payload, Task):
-            event = payload
-            break
+    event = persisted_task([call.args[0] for call in event_queue.enqueue_event.call_args_list])
 
     assert event is not None
     assert event.status.state == TaskState.TASK_STATE_FAILED
@@ -449,12 +435,7 @@ async def test_execute_response_info_error_maps_to_task_failed_state() -> None:
 
     await executor.execute(context, event_queue)
 
-    event = None
-    for call in event_queue.enqueue_event.call_args_list:
-        payload = call.args[0]
-        if isinstance(payload, Task):
-            event = payload
-            break
+    event = persisted_task([call.args[0] for call in event_queue.enqueue_event.call_args_list])
 
     assert event is not None
     assert event.status.state == TaskState.TASK_STATE_FAILED

@@ -45,6 +45,7 @@ from tests.support.helpers import (
     DummyChatOpencodeUpstreamClient,
     DummyEventQueue,
     make_request_context,
+    persisted_task,
 )
 
 
@@ -231,7 +232,8 @@ async def test_agent_uses_stable_fallback_message_id_when_upstream_missing_messa
         q,
     )
 
-    task = next(event for event in q.events if isinstance(event, Task))
+    task = persisted_task(q.events)
+    assert task is not None
     assert "message_id" not in task.metadata["shared"]["session"]
     assert task.status.message.message_id == "t-fallback:c-fallback:assistant"
     assert task.status.message.parts[0].text == "Completed."
@@ -280,7 +282,8 @@ async def test_agent_includes_usage_in_non_stream_task_metadata() -> None:
         q,
     )
 
-    task = next(event for event in q.events if isinstance(event, Task))
+    task = persisted_task(q.events)
+    assert task is not None
     usage = task.metadata["shared"]["usage"]
     assert usage["input_tokens"] == 7
     assert usage["output_tokens"] == 3
@@ -292,7 +295,6 @@ async def test_agent_includes_usage_in_non_stream_task_metadata() -> None:
 async def test_agent_handles_a2a_call_tool(monkeypatch) -> None:
     from a2a.types import (
         Artifact,
-        Task,
         TaskArtifactUpdateEvent,
     )
 
@@ -425,7 +427,6 @@ async def test_execution_coordinator_handles_tool_loop() -> None:
 
     from a2a.types import (
         Artifact,
-        Task,
         TaskArtifactUpdateEvent,
     )
 
@@ -437,7 +438,8 @@ async def test_execution_coordinator_handles_tool_loop() -> None:
     await executor.execute(make_request_context(task_id="t1", context_id="c1", text="start"), q)
 
     assert client.call_count == 2
-    task = next(event for event in q.events if isinstance(event, Task))
+    task = persisted_task(q.events)
+    assert task is not None
     assert task.status.message.parts[0].text == "Completed."
     assert (
         getattr(task.artifacts[0].parts[0], "text", None)
