@@ -49,13 +49,19 @@ state is necessary: previously saved grants are not trusted by this profile.
 
 ## Execution and failure semantics
 
-Only sessions created by this running gateway are executable. Unknown,
-preexisting, imported, child, or post-restart session IDs cannot be adopted.
+Only sessions created by this gateway are executable. Unknown, preexisting,
+imported and child session IDs are never adopted. A session created by a
+previous gateway process is re-adopted only when the registry tail equals the
+newest upstream message, which proves no other writer touched it since the last
+settled turn; any other post-restart ID is refused. A turn that was in flight
+when the process died stays unattributable and needs a new message. Records are
+a JSON sibling of the task-store database, never pruned.
 Preferred-session reuse additionally requires an existing owner binding under
 the ownership lock; knowing a freshly allocated but not-yet-bound ID cannot
 claim it before its creating request commits ownership.
-Persistent task history remains queryable after restart, but execution requires
-a new context/session. Follow-up in a healthy live session retains context.
+Persistent task history remains queryable after restart. Execution resumes in a
+session re-adopted by the tail check; a session that fails it needs a new
+context. Follow-up in a healthy live session retains context.
 Execution uses the configured workspace only. Per-request location changes,
 including another directory inside that root, are explicitly rejected rather
 than silently ignored when continuing a bound session. Default session-only V2
