@@ -1,0 +1,146 @@
+=== upstream: http://127.0.0.1:4097 ===
+=== host: pop-os ===
+gateway up; card: 200
+
+=== 1. plain text task ===
+{"jsonrpc":"2.0","id":"0bc7e255511d4edb8d08186a42268c59","result":{"task":{"id":"4767fde3-dd05-4a79-9fb0-1181982fc8ee","contextId":"probe-1","status":{"state":"TASK_STATE_COMPLETED","message":{"messageId":"msg_1c6841e29001uCQLE9LVXlcYD0","contextId":"probe-1","taskId":"4767fde3-dd05-4a79-9fb0-1181982fc8ee","role":"ROLE_AGENT","parts":[{"text":"Completed."}]}},"artifacts":[{"artifactId":"7bbcd43d-5e12-41c6-a48d-d4e367fc9e18","name":"response","parts":[{"text":"PROBE-OK-1234"}]}],"history":[{"messageId":"msg-8e625d608d604a2b876df84d2500e304","contextId":"probe-1","taskId":"4767fde3-dd05-4a79-9fb0-1181982fc8ee","role":"ROLE_USER","parts":[{"text":"Reply with exactly: PROBE-OK-1234"}]}]}}}
+state: TASK_STATE_COMPLETED
+
+=== 2. shell tool: run hostname and read a nonce file ===
+{"jsonrpc":"2.0","id":"090042d986b14968862214b3ab0399ac","result":{"task":{"id":"600fc932-3822-49c1-a512-c12cd2bd2dcb","contextId":"probe-2","status":{"state":"TASK_STATE_COMPLETED","message":{"messageId":"msg_1c6843465001kT6fkRzPZ6YhpM","contextId":"probe-2","taskId":"600fc932-3822-49c1-a512-c12cd2bd2dcb","role":"ROLE_AGENT","parts":[{"text":"Completed."}]}},"artifacts":[{"artifactId":"ff91142c-0ad1-4803-9671-ce78fad8f6bb","name":"response","parts":[{"text":"Both commands ran.\n\n- `hostname` → `pop-os`\n- `cat /tmp/opencode/probe/nonce.txt` → `nonce-f8ebd4ca9cc388d0`\n\nSkipped rtk for nothing; both outputs came through plain. Risk: none, both read-only."}]}],"history":[{"messageId":"msg-374cebca9e2a44b5aeb470caa635c305","contextId":"probe-2","taskId":"600fc932-3822-49c1-a512-c12cd2bd2dcb","role":"ROLE_USER","parts":[{"text":"Run the shell command `hostname` then `cat /tmp/opencode/probe/nonce.txt`, and reply with both outputs."}]}]}}}
+state: TASK_STATE_COMPLETED
+
+=== 3. two sequential contexts ===
+context probe-3a: {"jsonrpc":"2.0","id":"896c73bb35da4fbcbd5881b790e47bab","result":{"task":{"id":"ba1320cd-9677-4175-8bef-6bc823bffb44","contextId":"probe-3a","status":{"state":"TASK_STATE_COMPLETED","message":{"messageId":"msg_1c6843d19001CoLoWRqX0NkfSo","contextId":"probe-3a","taskId":"ba1320cd-9677-4175-8bef-6bc823bffb44","role":"ROLE_AGENT","parts":[{"text":"Completed."}]}},"artifacts":[{"artifactId":"16bb985a-d944-4ada-9229-3bdc1897682f","name":"response","parts":[{"text":"ALPHA-777"}]}],"history":[{"messageId":"msg-6197b6cc69b549de918643c428f6c335","contextId":"probe-3a","taskId":"ba1320cd-9677-4175-8bef-6bc823bffb44","role":"ROLE_USER","parts":[{"text":"Reply with exactly: ALPHA-777"}]}]}}}
+context probe-3b: {"jsonrpc":"2.0","id":"28a0d0e265d54ac8964fcd7209905b93","result":{"task":{"id":"89c931c2-3bd4-4796-bd89-cd8195921723","contextId":"probe-3b","status":{"state":"TASK_STATE_COMPLETED","message":{"messageId":"msg_1c68444710010uB58lSY2CKPkz","contextId":"probe-3b","taskId":"89c931c2-3bd4-4796-bd89-cd8195921723","role":"ROLE_AGENT","parts":[{"text":"Completed."}]}},"artifacts":[{"artifactId":"365823b2-64e7-4938-94f2-669b80183123","name":"response","parts":[{"text":"BETA-888"}]}],"history":[{"messageId":"msg-09af86a914e647a2b7ec003492d011cd","contextId":"probe-3b","taskId":"89c931c2-3bd4-4796-bd89-cd8195921723","role":"ROLE_USER","parts":[{"text":"Reply with exactly: BETA-888"}]}]}}}
+
+=== 4. gateway restart ===
+upstream sessions before restart:
+ses_e397bbc33ffeAt2w26HeUMCwsV
+ses_e397bc38affeVC89SUHPTT51Zl
+ses_e397bd79cffenDA7QvXU2rVrqB
+ses_e397be294ffeEGEQFfkFIn64Nd
+ses_e397c6839ffe6ezXEXc7S6VGrg
+ses_e397d4519ffeAtv2t72MgY30h0
+ses_e397d5595ffeLcmJHpKhV8SgLg
+ses_e397d646effeBJmBc9pKhDJgYx
+ses_e397d7893ffedfvm5zDiOi2jnE
+ses_e397d8186ffeh82t8RmCxAxfAZ
+ses_e397e6f02ffeqyUYqOC3jDsG0y
+ses_e397e8a26ffe5mSDoXB8k73JE9
+ses_e397e9e66ffeOS3xljwM76r5Jb
+ses_e397ec22cffeSLogqEl6Vjl36h
+ses_e397ec9d8ffeYlzQ4VOQjJEA6X
+ses_e39807e6cffeSKDn8maCDxajQ1
+ses_e3980ec84ffevA6LwdmUF5MmGR
+ses_e3981a10affedPe43Dl3H3RYvP
+ses_e39849faeffexSTUUFapNGWLWh
+ses_e3984f311ffe3FlbdwxzvawSCd
+ses_e39873b74ffeBHcC9BI5e90Zdv
+ses_e3987a1d7ffefLvfZrbT42IKq2
+ses_e3987f2f9ffdvmKV0jv39xFak5
+ses_e3987f2f9ffe1MCpdV71P6oCrh
+ses_e398b5eb8ffeWw54scKbv1CMkW
+ses_e398c7392ffeyWZF7zuXbbMY64
+ses_e398c7949ffexETPOLen6RoPNy
+ses_e398c9b9affelPyRgjRBovq3Us
+ses_e398df75fffeCpnv8fkXBz5Pwu
+ses_e3998e798ffe1bwoQMM5R5lGk9
+ses_e3998fddcffdQJF82nySKWaUBS
+ses_e3999ee7cffe9MBfc8GxZMi5jx
+ses_e399a49c5ffe4EmWaYH36AvVat
+ses_e399c947bffeKdM0J50H2vu6tx
+ses_e399cb0e8ffeX7tE43COCTNYiZ
+ses_e399cb6ccffeqhxlc39zKHoqYQ
+ses_e399cc2b3ffeLVY7dFK7Es5L4Z
+ses_e399cd492ffe2G4wjMZehDxnd0
+ses_e399df58effeA4VOLd3aYaRsjm
+ses_e399e83f6ffeCYOLaifQsJ7BVW
+ses_e399eaebaffeywM46e54W0UDMm
+ses_e399ef16effepWfgTUlYhe6jb3
+ses_e399fb4d9ffeNX47MxF1FehbbZ
+ses_e39a01058ffeRP0gO7JkDTuhBU
+ses_e39a03c2dffetQdDDsT4HZnidi
+ses_e39a04b31ffeWCfqP25sOPxBJ9
+ses_e39a0c728ffeN8k8cJzeS5u3O5
+ses_e39a37e49ffeefc9RBNJm25wFx
+ses_e39a39009ffeu53Xp5lnJ5VIkq
+ses_e39abf5d4ffdTUi4y0armuYu9P
+new context after restart: {"jsonrpc":"2.0","id":"510f2e0d998e4a3c8a6eb335d53ce979","result":{"task":{"id":"f59cdf96-7c52-483e-bd9b-5794017ac14f","contextId":"probe-4a","status":{"state":"TASK_STATE_COMPLETED","message":{"messageId":"msg_1c68455b5001sxP4RUlwkyCG2f","contextId":"probe-4a","taskId":"f59cdf96-7c52-483e-bd9b-5794017ac14f","role":"ROLE_AGENT","parts":[{"text":"Completed."}]}},"artifacts":[{"artifactId":"798a2503-e518-4bf9-a923-61e1633af00b","name":"response","parts":[{"text":"GAMMA-999"}]}],"history":[{"messageId":"msg-9c92c5dbee9c480dbf41ddfec702c634","contextId":"probe-4a","taskId":"f59cdf96-7c52-483e-bd9b-5794017ac14f","role":"ROLE_USER","parts":[{"text":"Reply with exactly: GAMMA-999"}]}]}}}
+state: TASK_STATE_COMPLETED
+old context probe-3a after restart: {"jsonrpc":"2.0","id":"f7dfa17c2d3a4bf0bec71bc5f81a6774","result":{"task":{"id":"6ec34aba-9d29-46ce-a67b-e5f0102c7d3d","contextId":"probe-3a","status":{"state":"TASK_STATE_COMPLETED","message":{"messageId":"msg_1c6845ec50016XkLoRd8a3I7d4","contextId":"probe-3a","taskId":"6ec34aba-9d29-46ce-a67b-e5f0102c7d3d","role":"ROLE_AGENT","parts":[{"text":"Completed."}]}},"artifacts":[{"artifactId":"60512de8-28df-4808-9f24-e32a5ad94aaa","name":"response","parts":[{"text":"ALPHA-777"}]}],"history":[{"messageId":"msg-0faa4aa16ba84acb8ca666dbf3336484","contextId":"probe-3a","taskId":"6ec34aba-9d29-46ce-a67b-e5f0102c7d3d","role":"ROLE_USER","parts":[{"text":"In your previous message in this session you replied with a single word. Reply with that word only."}]}]}}}
+state: TASK_STATE_COMPLETED
+upstream sessions after restart:
+ses_e397baaf4ffebuV3CayLOe60u4
+ses_e397bbc33ffeAt2w26HeUMCwsV
+ses_e397bc38affeVC89SUHPTT51Zl
+ses_e397bd79cffenDA7QvXU2rVrqB
+ses_e397be294ffeEGEQFfkFIn64Nd
+ses_e397c6839ffe6ezXEXc7S6VGrg
+ses_e397d4519ffeAtv2t72MgY30h0
+ses_e397d5595ffeLcmJHpKhV8SgLg
+ses_e397d646effeBJmBc9pKhDJgYx
+ses_e397d7893ffedfvm5zDiOi2jnE
+ses_e397d8186ffeh82t8RmCxAxfAZ
+ses_e397e6f02ffeqyUYqOC3jDsG0y
+ses_e397e8a26ffe5mSDoXB8k73JE9
+ses_e397e9e66ffeOS3xljwM76r5Jb
+ses_e397ec22cffeSLogqEl6Vjl36h
+ses_e397ec9d8ffeYlzQ4VOQjJEA6X
+ses_e39807e6cffeSKDn8maCDxajQ1
+ses_e3980ec84ffevA6LwdmUF5MmGR
+ses_e3981a10affedPe43Dl3H3RYvP
+ses_e39849faeffexSTUUFapNGWLWh
+ses_e3984f311ffe3FlbdwxzvawSCd
+ses_e39873b74ffeBHcC9BI5e90Zdv
+ses_e3987a1d7ffefLvfZrbT42IKq2
+ses_e3987f2f9ffdvmKV0jv39xFak5
+ses_e3987f2f9ffe1MCpdV71P6oCrh
+ses_e398b5eb8ffeWw54scKbv1CMkW
+ses_e398c7392ffeyWZF7zuXbbMY64
+ses_e398c7949ffexETPOLen6RoPNy
+ses_e398c9b9affelPyRgjRBovq3Us
+ses_e398df75fffeCpnv8fkXBz5Pwu
+ses_e3998e798ffe1bwoQMM5R5lGk9
+ses_e3998fddcffdQJF82nySKWaUBS
+ses_e3999ee7cffe9MBfc8GxZMi5jx
+ses_e399a49c5ffe4EmWaYH36AvVat
+ses_e399c947bffeKdM0J50H2vu6tx
+ses_e399cb0e8ffeX7tE43COCTNYiZ
+ses_e399cb6ccffeqhxlc39zKHoqYQ
+ses_e399cc2b3ffeLVY7dFK7Es5L4Z
+ses_e399cd492ffe2G4wjMZehDxnd0
+ses_e399df58effeA4VOLd3aYaRsjm
+ses_e399e83f6ffeCYOLaifQsJ7BVW
+ses_e399eaebaffeywM46e54W0UDMm
+ses_e399ef16effepWfgTUlYhe6jb3
+ses_e399fb4d9ffeNX47MxF1FehbbZ
+ses_e39a01058ffeRP0gO7JkDTuhBU
+ses_e39a03c2dffetQdDDsT4HZnidi
+ses_e39a04b31ffeWCfqP25sOPxBJ9
+ses_e39a0c728ffeN8k8cJzeS5u3O5
+ses_e39a37e49ffeefc9RBNJm25wFx
+ses_e39abf5d4ffdTUi4y0armuYu9P
+
+=== 5. foreign writer while the gateway is down ===
+session behind probe-3a: ses_e397bc38affeVC89SUHPTT51Zl
+registry tail: msg_1c684728b0019oeA2hiJzABoCl
+{"data":{"id":"msg_f38a67f22437266d","sessionID":"ses_e397bc38affeVC89SUHPTT51Zl","time":{"created":1794331933560},"type":"user","payload":{"text":"Reply with exactly: FOREIGN-999"},"delivery":"queue"}}upstream newest: msg_f38a67f22437266d
+tampered context probe-3a: {"jsonrpc":"2.0","id":"e0040e893b8a4c25952696a49f9031fd","result":{"task":{"id":"ddfddce7-d964-4707-a512-4df13d9f6033","contextId":"probe-3a","status":{"state":"TASK_STATE_FAILED","message":{"messageId":"507b29dd-3551-40d8-bf12-d85488a56085","contextId":"probe-3a","taskId":"ddfddce7-d964-4707-a512-4df13d9f6033","role":"ROLE_AGENT","parts":[{"text":"OpenCode error: V2 execution requires a gateway-created session"}]}},"artifacts":[{"artifactId":"ddfddce7-d964-4707-a512-4df13d9f6033:error","parts":[{"text":"OpenCode error: V2 execution requires a gateway-created session"}]}],"history":[{"messageId":"msg-a31368e29e414b02af4edc4b2608081a","contextId":"probe-3a","taskId":"ddfddce7-d964-4707-a512-4df13d9f6033","role":"ROLE_USER","parts":[{"text":"Reply with exactly: MUST-REFUSE"}]}]}}}
+state: TASK_STATE_FAILED
+PASS 1 completed with PROBE-OK-1234
+PASS 1 state completed
+PASS 2 hostname in reply
+PASS 2 nonce in reply
+PASS 3 context a answered
+PASS 3 context a has no b text
+PASS 3 context b answered
+PASS 3 context b has no a text
+PASS 4 new task after restart
+PASS 4 old context adopted after restart
+PASS 4 adopted context recalls its own answer
+PASS 5 tampered context refused
+PASS 5 refusal names the ownership rule
+
+=== PROBE PASSED ===
+report: /tmp/opencode/probe/report.txt
