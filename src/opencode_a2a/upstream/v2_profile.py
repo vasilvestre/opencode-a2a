@@ -52,12 +52,11 @@ def validate_exclusive_configuration(entries: object, plugins: object) -> None:
 
 def exclusive_permissions(policy: str = "readonly") -> list[dict[str, str]]:
     if policy == "full":
-        # Shared-workspace operator choice: the agent keeps the workspace boundary
-        # but may run every builtin tool, shell included.
-        return [
-            {"action": "*", "resource": "*", "effect": "allow"},
-            {"action": "external_directory", "resource": "*", "effect": "deny"},
-        ]
+        # Shared-workspace operator choice: no filesystem boundary either. Delegated
+        # work names repositories anywhere under the user's home, so a workspace
+        # boundary makes the agent useless and pushes it to ask a human to run
+        # commands. Keep the gateway on loopback when you choose this.
+        return [{"action": "*", "resource": "*", "effect": "allow"}]
     return [
         {"action": "*", "resource": "*", "effect": "deny"},
         {"action": "question", "resource": "*", "effect": "allow"},

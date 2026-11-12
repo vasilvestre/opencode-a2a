@@ -84,15 +84,15 @@ async def test_exclusive_workspace_is_fixed_without_changing_default_v2_transpor
         await transport.close()
 
 
-def test_tool_policy_full_lifts_the_deny_all_rule_only() -> None:
+def test_tool_policy_full_keeps_no_boundary() -> None:
     assert exclusive_permissions() == exclusive_permissions("readonly")
-    assert {"action": "*", "resource": "*", "effect": "deny"} not in exclusive_permissions("full")
-    assert {"action": "*", "resource": "*", "effect": "allow"} in exclusive_permissions("full")
-    assert exclusive_permissions("full")[-1] == {
-        "action": "external_directory",
-        "resource": "*",
-        "effect": "deny",
-    }
+    assert exclusive_permissions("full") == [{"action": "*", "resource": "*", "effect": "allow"}]
+
+
+def test_tool_policy_readonly_still_confines_the_filesystem() -> None:
+    assert {"action": "external_directory", "resource": "*", "effect": "deny"} in (
+        exclusive_permissions("readonly")
+    )
 
 
 def _exclusive_settings(**overrides: object):
